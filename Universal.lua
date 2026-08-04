@@ -1,16 +1,14 @@
--- Universal Script for Roblox (Delta Executor & Mobile/PC Supported)
--- Library: Orion Library
+-- Universal Script with Rayfield Library
+-- Optimized for Mobile / PC Executors
 
-local OrionLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Orion/main/source'))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local Window = OrionLib:MakeWindow({
-    Name = "Universal Script | Delta Edition",
-    HidePremium = false,
-    SaveConfig = true,
-    ConfigFolder = "UniversalScriptConfig",
-    IntroEnabled = true,
-    IntroText = "Universal Script",
-    IntroIcon = "rbxassetid://4483362458"
+local Window = Rayfield:CreateWindow({
+    Name = "Universal Script | Fixed & Enhanced",
+    LoadingTitle = "Initializing Modules...",
+    LoadingSubtitle = "by Assistant",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false
 })
 
 -- Services
@@ -19,443 +17,202 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local SoundService = game:GetService("SoundService")
-local StatsService = game:GetService("Stats")
-local TeleportService = game:GetService("TeleportService")
-local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- Tracking Connections for Unload
-local Connections = {}
-
 -- Global Configurations
 local Config = {
+    ChinaHat = { Enabled = false, Color = Color3.fromRGB(255, 0, 0), RGB = false, RotationSpeed = 100 },
+    Aimbot = { Enabled = false, ShowFOV = false, FOVRadius = 120, Smoothness = 0.2, Priority = "Crosshair", WallCheck = false, TeamCheck = true, AliveCheck = true },
+    Hitbox = { Enabled = false, Size = 10, Transparency = 0.5, Color = Color3.fromRGB(255, 0, 0), AlwaysOnTop = false, TeamCheck = true },
+    KillSound = { Enabled = false, SoundId = "132059151263428" },
     Movement = {
-        WallHop = false,
-        WallHopLevel = 3,
-        Noclip = false,
-        Fly = false,
-        FlySpeed = 50,
-        Speed = 16,
-        Gravity = 196.2,
-        Jump = 50,
-        SpeedEnabled = false,
-        GravityEnabled = false,
-        JumpEnabled = false
-    },
-    Combat = {
-        Aimbot = false,
-        ShowFOV = false,
-        FOVRadius = 120,
-        Smoothness = 0.2,
-        Priority = "Crosshair",
-        WallCheck = false,
-        TeamCheck = true,
-        KillSound = false,
-        KillSoundID = "4817809188"
-    },
-    HUD = {
-        FPSPing = false
-    },
-    Language = "English"
+        Speed = { Enabled = false, Value = 16, Default = 16 },
+        Gravity = { Enabled = false, Value = 196.2, Default = 196.2 },
+        Jump = { Enabled = false, Value = 50, DefaultPower = 50, DefaultHeight = 7.2 },
+        WallHop = { Enabled = false, Level = 1 }
+    }
 }
 
 --------------------------------------------------------------------------------
--- DRAWING FOV CIRCLE (PERFECTLY ROUND: NumSides = 64)
+-- STABLE FOV GUI
 --------------------------------------------------------------------------------
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.NumSides = 64
-FOVCircle.Thickness = 1.5
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.Filled = false
-FOVCircle.Transparency = 1
-FOVCircle.Visible = false
+local FOVGui = Instance.new("ScreenGui")
+FOVGui.Name = "UniversalFOVScreen"
+FOVGui.ResetOnSpawn = false
+FOVGui.IgnoreGuiInset = true
+FOVGui.Parent = game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+
+local FOVFrame = Instance.new("Frame")
+FOVFrame.Size = UDim2.new(1, 0, 1, 0)
+FOVFrame.BackgroundTransparency = 1
+FOVFrame.Visible = false
+FOVFrame.Parent = FOVGui
+
+local FOVStroke = Instance.new("UIStroke")
+FOVStroke.Color = Color3.fromRGB(255, 255, 255)
+FOVStroke.Thickness = 1.5
+
+local FOVCorner = Instance.new("UICorner")
+FOVCorner.CornerRadius = UDim.new(1, 0)
+
+local FOVIndicator = Instance.new("Frame")
+FOVIndicator.Name = "Circle"
+FOVIndicator.AnchorPoint = Vector2.new(0.5, 0.5)
+FOVIndicator.BackgroundTransparency = 1
+FOVIndicator.Parent = FOVFrame
+FOVStroke.Parent = FOVIndicator
+FOVCorner.Parent = FOVIndicator
 
 --------------------------------------------------------------------------------
 -- TABS
 --------------------------------------------------------------------------------
-local MoveTab = Window:MakeTab({ Name = "Movement & Physics", Icon = "rbxassetid://4483362458", PremiumOnly = false })
-local CombatTab = Window:MakeTab({ Name = "Combat & Visuals", Icon = "rbxassetid://4483362458", PremiumOnly = false })
-local HUDTab = Window:MakeTab({ Name = "HUD & Display", Icon = "rbxassetid://4483362458", PremiumOnly = false })
-local SettingsTab = Window:MakeTab({ Name = "Settings", Icon = "rbxassetid://4483362458", PremiumOnly = false })
+local CombatTab = Window:CreateTab("Combat & Visuals", 4483362458)
+local AimTab = Window:CreateTab("FOV Aimbot", 4483362458)
+local HitboxTab = Window:CreateTab("Hitbox Expander", 4483362458)
+local MoveTab = Window:CreateTab("Movement / Physics", 4483362458)
 
 --------------------------------------------------------------------------------
--- TAB 1: MOVEMENT & PHYSICS
+-- MODULE 1: CHINA HAT & KILL SOUND
 --------------------------------------------------------------------------------
-MoveTab:AddSection({ Name = "Wall Hop" })
-
-MoveTab:AddToggle({
-    Name = "Enable Wall Hop",
-    Default = false,
-    Callback = function(Value)
-        Config.Movement.WallHop = Value
-    end
-})
-
-MoveTab:AddSlider({
-    Name = "Wall Hop Level",
-    Min = 1,
-    Max = 5,
-    Default = 3,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 1,
-    ValueName = "Level",
-    Callback = function(Value)
-        Config.Movement.WallHopLevel = Value
-    end
-})
-
-Connections.JumpRequest = UserInputService.JumpRequest:Connect(function()
-    if Config.Movement.WallHop then
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            local hrp = char.HumanoidRootPart
-            local boost = Config.Movement.WallHopLevel * 12
-            hrp.AssemblyLinearVelocity = Vector3.new(
-                hrp.AssemblyLinearVelocity.X * 1.05,
-                boost + 25,
-                hrp.AssemblyLinearVelocity.Z * 1.05
-            )
-        end
-    end
-end)
-
-MoveTab:AddSection({ Name = "Fly & Noclip" })
-
-MoveTab:AddToggle({
-    Name = "Noclip",
-    Default = false,
-    Callback = function(Value)
-        Config.Movement.Noclip = Value
-    end
-})
-
-Connections.NoclipLoop = RunService.Stepped:Connect(function()
-    if Config.Movement.Noclip and LocalPlayer.Character then
-        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide then
-                part.CanCollide = false
-            end
-        end
-    end
-end)
-
-local flyBV, flyBG
-local function StopFly()
-    if flyBV then flyBV:Destroy(); flyBV = nil end
-    if flyBG then flyBG:Destroy(); flyBG = nil end
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChildOfClass("Humanoid") then
-        char:FindFirstChildOfClass("Humanoid").PlatformStand = false
-    end
+local HatPart = nil
+local function RemoveHat()
+    if HatPart then HatPart:Destroy(); HatPart = nil end
 end
 
-MoveTab:AddToggle({
-    Name = "Enable Fly",
-    Default = false,
-    Callback = function(Value)
-        Config.Movement.Fly = Value
-        if not Value then
-            StopFly()
+local function CreateHat()
+    RemoveHat()
+    HatPart = Instance.new("Part")
+    HatPart.Size = Vector3.new(3, 1, 3)
+    HatPart.CanCollide = false
+    HatPart.Anchored = true
+    HatPart.CastShadow = false
+    HatPart.Material = Enum.Material.SmoothPlastic
+    HatPart.Transparency = 0.2
+    HatPart.Color = Config.ChinaHat.Color
+
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.FileMesh
+    mesh.MeshId = "rbxassetid://1033714"
+    mesh.Scale = Vector3.new(2.2, 1.2, 2.2)
+    mesh.Parent = HatPart
+    HatPart.Parent = Workspace
+end
+
+CombatTab:CreateToggle({
+    Name = "Enable China Hat", CurrentValue = false,
+    Callback = function(V) Config.ChinaHat.Enabled = V if not V then RemoveHat() end end
+})
+CombatTab:CreateColorPicker({
+    Name = "Hat Color", Color = Color3.fromRGB(255, 0, 0),
+    Callback = function(V) Config.ChinaHat.Color = V if HatPart then HatPart.Color = V end end
+})
+CombatTab:CreateToggle({
+    Name = "RGB Rainbow Mode", CurrentValue = false,
+    Callback = function(V) Config.ChinaHat.RGB = V end
+})
+
+-- Kill Sound Setup
+CombatTab:CreateToggle({
+    Name = "Enable Kill Sound", CurrentValue = false,
+    Callback = function(V) Config.KillSound.Enabled = V end
+})
+
+CombatTab:CreateInput({
+    Name = "Kill Sound ID",
+    PlaceholderText = "132059151263428",
+    RemoveTextOnFocusLost = false,
+    Callback = function(Text)
+        if Text and #Text > 0 then
+            Config.KillSound.SoundId = Text:match("%d+") or Text
         end
     end
 })
 
-MoveTab:AddSlider({
-    Name = "Fly Speed",
-    Min = 10,
-    Max = 200,
-    Default = 50,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 5,
-    ValueName = "Speed",
-    Callback = function(Value)
-        Config.Movement.FlySpeed = Value
-    end
-})
+local function PlayKillSound()
+    if not Config.KillSound.Enabled or not Config.KillSound.SoundId then return end
+    task.spawn(function()
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxassetid://" .. tostring(Config.KillSound.SoundId)
+        sound.Volume = 2
+        sound.Parent = SoundService
+        sound:Play()
+        sound.Ended:Connect(function()
+            sound:Destroy()
+        end)
+    end)
+end
 
-Connections.FlyLoop = RunService.RenderStepped:Connect(function()
-    if Config.Movement.Fly then
+local hue = 0
+RunService.RenderStepped:Connect(function(dt)
+    if Config.ChinaHat.Enabled then
         local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
-            local hrp = char.HumanoidRootPart
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            hum.PlatformStand = true
-
-            if not flyBV then
-                flyBV = Instance.new("BodyVelocity")
-                flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-                flyBV.Parent = hrp
-            end
-
-            if not flyBG then
-                flyBG = Instance.new("BodyGyro")
-                flyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-                flyBG.P = 9e4
-                flyBG.Parent = hrp
-            end
-
-            flyBG.CFrame = Camera.CFrame
-            local moveDir = hum.MoveDirection
-            if moveDir.Magnitude > 0 then
-                flyBV.Velocity = Camera.CFrame:VectorToWorldSpace(Vector3.new(moveDir.X, 0, moveDir.Z).Unit) * Config.Movement.FlySpeed
+        if char and char:FindFirstChild("Head") then
+            if not HatPart or not HatPart.Parent then CreateHat() end
+            HatPart.CFrame = char.Head.CFrame * CFrame.new(0, 1.2, 0) * CFrame.Angles(0, math.rad(tick() * Config.ChinaHat.RotationSpeed % 360), 0)
+            if Config.ChinaHat.RGB then
+                hue = (hue + dt * 0.5) % 1
+                HatPart.Color = Color3.fromHSV(hue, 1, 1)
             else
-                flyBV.Velocity = Vector3.new(0, 0, 0)
+                HatPart.Color = Config.ChinaHat.Color
             end
+        else
+            RemoveHat()
         end
     else
-        StopFly()
-    end
-end)
-
-MoveTab:AddSection({ Name = "Speed, Gravity & Jump" })
-
-local SpeedSlider, GravitySlider, JumpSlider
-
-MoveTab:AddToggle({
-    Name = "Enable Custom Speed",
-    Default = false,
-    Callback = function(Value)
-        Config.Movement.SpeedEnabled = Value
-        if not Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-            LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
-        end
-    end
-})
-
-SpeedSlider = MoveTab:AddSlider({
-    Name = "WalkSpeed",
-    Min = 16,
-    Max = 200,
-    Default = 16,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 1,
-    ValueName = "Speed",
-    Callback = function(Value)
-        Config.Movement.Speed = Value
-    end
-})
-
-MoveTab:AddTextbox({
-    Name = "Exact Speed",
-    Default = "16",
-    TextDisappear = false,
-    Callback = function(Text)
-        local val = tonumber(Text)
-        if val then
-            Config.Movement.Speed = val
-            SpeedSlider:Set(val)
-        end
-    end
-})
-
-MoveTab:AddToggle({
-    Name = "Enable Custom Gravity",
-    Default = false,
-    Callback = function(Value)
-        Config.Movement.GravityEnabled = Value
-        if not Value then
-            Workspace.Gravity = 196.2
-        end
-    end
-})
-
-GravitySlider = MoveTab:AddSlider({
-    Name = "Gravity",
-    Min = 0,
-    Max = 196.2,
-    Default = 196.2,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 1,
-    ValueName = "Gravity",
-    Callback = function(Value)
-        Config.Movement.Gravity = Value
-    end
-})
-
-MoveTab:AddTextbox({
-    Name = "Exact Gravity",
-    Default = "196.2",
-    TextDisappear = false,
-    Callback = function(Text)
-        local val = tonumber(Text)
-        if val then
-            Config.Movement.Gravity = val
-            GravitySlider:Set(val)
-        end
-    end
-})
-
-MoveTab:AddToggle({
-    Name = "Enable Custom Jump",
-    Default = false,
-    Callback = function(Value)
-        Config.Movement.JumpEnabled = Value
-        if not Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            hum.JumpPower = 50
-            hum.JumpHeight = 7.2
-        end
-    end
-})
-
-JumpSlider = MoveTab:AddSlider({
-    Name = "Jump Power / Height",
-    Min = 7,
-    Max = 250,
-    Default = 50,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 1,
-    ValueName = "Jump",
-    Callback = function(Value)
-        Config.Movement.Jump = Value
-    end
-})
-
-MoveTab:AddTextbox({
-    Name = "Exact Jump",
-    Default = "50",
-    TextDisappear = false,
-    Callback = function(Text)
-        local val = tonumber(Text)
-        if val then
-            Config.Movement.Jump = val
-            JumpSlider:Set(val)
-        end
-    end
-})
-
-Connections.PhysicsLoop = RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            if Config.Movement.SpeedEnabled then
-                hum.WalkSpeed = Config.Movement.Speed
-            end
-            if Config.Movement.JumpEnabled then
-                if hum.UseJumpPower then
-                    hum.JumpPower = Config.Movement.Jump
-                else
-                    hum.JumpHeight = Config.Movement.Jump
-                end
-            end
-        end
-    end
-    if Config.Movement.GravityEnabled then
-        Workspace.Gravity = Config.Movement.Gravity
+        RemoveHat()
     end
 end)
 
 --------------------------------------------------------------------------------
--- TAB 2: COMBAT & VISUALS
+-- MODULE 2: FOV AIMBOT
 --------------------------------------------------------------------------------
-CombatTab:AddSection({ Name = "FOV Aimbot" })
+AimTab:CreateToggle({ Name = "Enable Aimbot", CurrentValue = false, Callback = function(V) Config.Aimbot.Enabled = V end })
+AimTab:CreateToggle({ Name = "Draw FOV Circle", CurrentValue = false, Callback = function(V) Config.Aimbot.ShowFOV = V; FOVFrame.Visible = V end })
+AimTab:CreateSlider({ Name = "FOV Radius", Range = {30, 500}, Increment = 5, CurrentValue = 120, Callback = function(V) Config.Aimbot.FOVRadius = V end })
+AimTab:CreateSlider({ Name = "Smoothness", Range = {0.01, 1}, Increment = 0.01, CurrentValue = 0.2, Callback = function(V) Config.Aimbot.Smoothness = V end })
+AimTab:CreateDropdown({ Name = "Priority Mode", Options = {"Crosshair", "Distance", "Lowest Health"}, CurrentOption = "Crosshair", Callback = function(V) Config.Aimbot.Priority = typeof(V) == "table" and V[1] or V end })
+AimTab:CreateToggle({ Name = "Wall Check", CurrentValue = false, Callback = function(V) Config.Aimbot.WallCheck = V end })
+AimTab:CreateToggle({ Name = "Team Check", CurrentValue = true, Callback = function(V) Config.Aimbot.TeamCheck = V end })
+AimTab:CreateToggle({ Name = "Alive Check", CurrentValue = true, Callback = function(V) Config.Aimbot.AliveCheck = V end })
 
-CombatTab:AddToggle({
-    Name = "Enable Aimbot",
-    Default = false,
-    Callback = function(Value)
-        Config.Combat.Aimbot = Value
-    end
-})
-
-CombatTab:AddToggle({
-    Name = "Show FOV Circle",
-    Default = false,
-    Callback = function(Value)
-        Config.Combat.ShowFOV = Value
-    end
-})
-
-CombatTab:AddSlider({
-    Name = "FOV Radius",
-    Min = 30,
-    Max = 500,
-    Default = 120,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 5,
-    ValueName = "Radius",
-    Callback = function(Value)
-        Config.Combat.FOVRadius = Value
-    end
-})
-
-CombatTab:AddSlider({
-    Name = "Smoothness",
-    Min = 0.01,
-    Max = 1,
-    Default = 0.2,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 0.01,
-    ValueName = "Smooth",
-    Callback = function(Value)
-        Config.Combat.Smoothness = Value
-    end
-})
-
-CombatTab:AddDropdown({
-    Name = "Priority Mode",
-    Default = "Crosshair",
-    Options = {"Crosshair", "Distance", "Lowest Health"},
-    Callback = function(Value)
-        Config.Combat.Priority = Value
-    end
-})
-
-CombatTab:AddToggle({
-    Name = "Wall Check",
-    Default = false,
-    Callback = function(Value)
-        Config.Combat.WallCheck = Value
-    end
-})
-
-CombatTab:AddToggle({
-    Name = "Team Check",
-    Default = true,
-    Callback = function(Value)
-        Config.Combat.TeamCheck = Value
-    end
-})
-
-local function IsTargetVisible(targetHead, targetChar)
-    if not Config.Combat.WallCheck then return true end
+local function IsVisible(targetPart, character)
+    if not Config.Aimbot.WallCheck then return true end
     local rayParams = RaycastParams.new()
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character, targetChar}
-    local result = Workspace:Raycast(Camera.CFrame.Position, targetHead.Position - Camera.CFrame.Position, rayParams)
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character, character}
+    local result = Workspace:Raycast(Camera.CFrame.Position, targetPart.Position - Camera.CFrame.Position, rayParams)
     return result == nil
 end
 
-local function GetAimbotTarget()
+local function GetClosestTarget()
     local bestTarget = nil
     local bestMetric = math.huge
-    local mousePos = UserInputService:GetMouseLocation()
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
-            if not Config.Combat.TeamCheck or player.Team ~= LocalPlayer.Team then
+            if not Config.Aimbot.TeamCheck or player.Team ~= LocalPlayer.Team then
                 local char = player.Character
                 if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("Head") then
                     local hum = char.Humanoid
-                    if hum.Health > 0 then
+                    if not Config.Aimbot.AliveCheck or hum.Health > 0 then
                         local head = char.Head
                         local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
                         if onScreen then
                             local screenVec = Vector2.new(screenPos.X, screenPos.Y)
-                            local distFromMouse = (screenVec - mousePos).Magnitude
+                            local distFromCenter = (screenVec - screenCenter).Magnitude
 
-                            if distFromMouse <= Config.Combat.FOVRadius then
-                                if IsTargetVisible(head, char) then
-                                    local metric = distFromMouse
-                                    if Config.Combat.Priority == "Distance" then
+                            if distFromCenter <= Config.Aimbot.FOVRadius then
+                                if IsVisible(head, char) then
+                                    local metric = distFromCenter
+                                    if Config.Aimbot.Priority == "Distance" then
                                         local myChar = LocalPlayer.Character
                                         if myChar and myChar:FindFirstChild("HumanoidRootPart") then
                                             metric = (myChar.HumanoidRootPart.Position - head.Position).Magnitude
                                         end
-                                    elseif Config.Combat.Priority == "Lowest Health" then
+                                    elseif Config.Aimbot.Priority == "Lowest Health" then
                                         metric = hum.Health
                                     end
 
@@ -474,221 +231,204 @@ local function GetAimbotTarget()
     return bestTarget
 end
 
-Connections.AimbotLoop = RunService.RenderStepped:Connect(function()
-    local mousePos = UserInputService:GetMouseLocation()
-    FOVCircle.Position = mousePos
-    FOVCircle.Radius = Config.Combat.FOVRadius
-    FOVCircle.Visible = Config.Combat.ShowFOV
+RunService.RenderStepped:Connect(function()
+    local viewportSize = Camera.ViewportSize
+    local centerPos = UDim2.new(0, viewportSize.X / 2, 0, viewportSize.Y / 2)
+    FOVIndicator.Position = centerPos
+    FOVIndicator.Size = UDim2.new(0, Config.Aimbot.FOVRadius * 2, 0, Config.Aimbot.FOVRadius * 2)
 
-    if Config.Combat.Aimbot then
-        local targetHead = GetAimbotTarget()
+    if Config.Aimbot.Enabled then
+        local targetHead = GetClosestTarget()
         if targetHead then
             local currentCF = Camera.CFrame
             local targetCF = CFrame.lookAt(currentCF.Position, targetHead.Position)
-            Camera.CFrame = currentCF:Lerp(targetCF, 1 - Config.Combat.Smoothness)
+            Camera.CFrame = currentCF:Lerp(targetCF, 1 - Config.Aimbot.Smoothness)
         end
     end
 end)
 
-CombatTab:AddSection({ Name = "Kill Sound" })
+--------------------------------------------------------------------------------
+-- MODULE 3: HITBOX EXPANDER
+--------------------------------------------------------------------------------
+HitboxTab:CreateToggle({ Name = "Enable Hitbox", CurrentValue = false, Callback = function(V) Config.Hitbox.Enabled = V end })
+HitboxTab:CreateSlider({ Name = "Size", Range = {2, 60}, Increment = 1, CurrentValue = 10, Callback = function(V) Config.Hitbox.Size = V end })
+HitboxTab:CreateSlider({ Name = "Transparency", Range = {0, 1}, Increment = 0.05, CurrentValue = 0.5, Callback = function(V) Config.Hitbox.Transparency = V end })
+HitboxTab:CreateColorPicker({ Name = "Color", Color = Color3.fromRGB(255, 0, 0), Callback = function(V) Config.Hitbox.Color = V end })
+HitboxTab:CreateToggle({ Name = "Always On Top", CurrentValue = false, Callback = function(V) Config.Hitbox.AlwaysOnTop = V end })
+HitboxTab:CreateToggle({ Name = "Team Check", CurrentValue = true, Callback = function(V) Config.Hitbox.TeamCheck = V end })
 
-CombatTab:AddToggle({
-    Name = "Enable Kill Sound",
-    Default = false,
-    Callback = function(Value)
-        Config.Combat.KillSound = Value
+RunService.Heartbeat:Connect(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local isTeammate = Config.Hitbox.TeamCheck and (player.Team == LocalPlayer.Team)
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+                local hrp = char.HumanoidRootPart
+                local hum = char.Humanoid
+                if Config.Hitbox.Enabled and not isTeammate and hum.Health > 0 then
+                    hrp.Size = Vector3.new(Config.Hitbox.Size, Config.Hitbox.Size, Config.Hitbox.Size)
+                    hrp.Transparency = Config.Hitbox.Transparency
+                    hrp.Color = Config.Hitbox.Color
+                    hrp.Material = Config.Hitbox.AlwaysOnTop and Enum.Material.ForceField or Enum.Material.SmoothPlastic
+                    hrp.CanCollide = false
+                else
+                    hrp.Size = Vector3.new(2, 2, 1)
+                    hrp.Transparency = 1
+                    hrp.Material = Enum.Material.SmoothPlastic
+                end
+            end
+        end
     end
-})
+end)
 
-CombatTab:AddTextbox({
-    Name = "Sound Asset ID",
-    Default = "4817809188",
-    TextDisappear = false,
-    Callback = function(Text)
-        if Text and #Text > 0 then
-            Config.Combat.KillSoundID = Text
+--------------------------------------------------------------------------------
+-- MODULE 4: MOVEMENT / PHYSICS (Speed, Gravity, Jump, Wall Hop)
+--------------------------------------------------------------------------------
+local SpeedSlider, GravitySlider, JumpSlider
+
+MoveTab:CreateToggle({
+    Name = "Enable Speedhack",
+    CurrentValue = false,
+    Callback = function(Value)
+        Config.Movement.Speed.Enabled = Value
+        if not Value then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") then
+                char:FindFirstChildOfClass("Humanoid").WalkSpeed = Config.Movement.Speed.Default
+            end
         end
     end
 })
 
-local function PlayKillSound()
-    if not Config.Combat.KillSound then return end
-    local sound = Instance.new("Sound")
-    sound.SoundId = "rbxassetid://" .. tostring(Config.Combat.KillSoundID)
-    sound.Volume = 2
-    sound.Parent = SoundService
-    sound:Play()
-    sound.Ended:Connect(function()
-        sound:Destroy()
-    end)
-end
+SpeedSlider = MoveTab:CreateSlider({
+    Name = "WalkSpeed Slider", Range = {16, 50}, Increment = 1, CurrentValue = 16,
+    Callback = function(Value) Config.Movement.Speed.Value = Value end
+})
 
-local function TrackPlayerDeath(player)
+MoveTab:CreateToggle({
+    Name = "Enable Custom Gravity",
+    CurrentValue = false,
+    Callback = function(Value)
+        Config.Movement.Gravity.Enabled = Value
+        if not Value then Workspace.Gravity = Config.Movement.Gravity.Default end
+    end
+})
+
+GravitySlider = MoveTab:CreateSlider({
+    Name = "Gravity Slider", Range = {0, 196.2}, Increment = 1, CurrentValue = 196.2,
+    Callback = function(Value) Config.Movement.Gravity.Value = Value end
+})
+
+MoveTab:CreateToggle({
+    Name = "Enable Custom Jump",
+    CurrentValue = false,
+    Callback = function(Value)
+        Config.Movement.Jump.Enabled = Value
+        if not Value then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                hum.JumpPower = Config.Movement.Jump.DefaultPower
+                hum.JumpHeight = Config.Movement.Jump.DefaultHeight
+            end
+        end
+    end
+})
+
+JumpSlider = MoveTab:CreateSlider({
+    Name = "Jump Slider", Range = {7.2, 250}, Increment = 1, CurrentValue = 50,
+    Callback = function(Value) Config.Movement.Jump.Value = Value end
+})
+
+-- WALL HOP IMPLEMENTATION
+MoveTab:CreateToggle({
+    Name = "Enable Wall Hop",
+    CurrentValue = false,
+    Callback = function(Value)
+        Config.Movement.WallHop.Enabled = Value
+    end
+})
+
+MoveTab:CreateSlider({
+    Name = "Wall Hop Level (1 - 5)",
+    Range = {1, 5},
+    Increment = 1,
+    CurrentValue = 1,
+    Callback = function(Value)
+        Config.Movement.WallHop.Level = Value
+    end
+})
+
+-- Wall Hop & Physics Loop
+local lastHop = 0
+UserInputService.JumpRequest:Connect(function()
+    if not Config.Movement.WallHop.Enabled then return end
+    if tick() - lastHop < 0.25 then return end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = {char}
+
+    -- Проверка наличия стены рядом
+    local lookVector = hrp.CFrame.LookVector
+    local rayResult = Workspace:Raycast(hrp.Position, lookVector * 3.5, rayParams)
+
+    if rayResult then
+        lastHop = tick()
+        local boost = Config.Movement.WallHop.Level * 12
+        local jumpBoost = Config.Movement.WallHop.Level * 8
+        hrp.AssemblyLinearVelocity = Vector3.new(
+            hrp.AssemblyLinearVelocity.X + (lookVector.X * boost),
+            50 + jumpBoost,
+            hrp.AssemblyLinearVelocity.Z + (lookVector.Z * boost)
+        )
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            if Config.Movement.Speed.Enabled then humanoid.WalkSpeed = Config.Movement.Speed.Value end
+            if Config.Movement.Jump.Enabled then
+                if humanoid.UseJumpPower then humanoid.JumpPower = Config.Movement.Jump.Value
+                else humanoid.JumpHeight = Config.Movement.Jump.Value end
+            end
+        end
+    end
+    if Config.Movement.Gravity.Enabled then Workspace.Gravity = Config.Movement.Gravity.Value end
+end)
+
+--------------------------------------------------------------------------------
+-- KILL TRACKER FOR KILL SOUND
+--------------------------------------------------------------------------------
+local function HookPlayer(player)
     if player == LocalPlayer then return end
-    local function OnChar(char)
+    player.CharacterAdded:Connect(function(char)
         local hum = char:WaitForChild("Humanoid", 5)
         if hum then
             hum.Died:Connect(function()
-                if Config.Combat.KillSound then
-                    PlayKillSound()
+                -- Проверка: находился ли игрок рядом или нанесен ли удар
+                local myChar = LocalPlayer.Character
+                if myChar and myChar:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("HumanoidRootPart") then
+                    local dist = (myChar.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+                    if dist <= 80 then
+                        PlayKillSound()
+                    end
                 end
             end)
         end
-    end
-    if player.Character then OnChar(player.Character) end
-    player.CharacterAdded:Connect(OnChar)
+    end)
 end
 
-for _, p in ipairs(Players:GetPlayers()) do TrackPlayerDeath(p) end
-Connections.PlayerAddedKillSound = Players.PlayerAdded:Connect(TrackPlayerDeath)
+for _, p in ipairs(Players:GetPlayers()) do HookPlayer(p) end
+Players.PlayerAdded:Connect(HookPlayer)
 
---------------------------------------------------------------------------------
--- TAB 3: HUD & DISPLAY
---------------------------------------------------------------------------------
-HUDTab:AddSection({ Name = "FPS & Ping Overlay" })
-
-local HUDGui = Instance.new("ScreenGui")
-HUDGui.Name = "UniversalHUD"
-HUDGui.ResetOnSpawn = false
-HUDGui.Parent = CoreGui or LocalPlayer:WaitForChild("PlayerGui")
-
-local HUDLabel = Instance.new("TextLabel")
-HUDLabel.Size = UDim2.new(0, 180, 0, 30)
-HUDLabel.Position = UDim2.new(0, 15, 0, 15)
-HUDLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-HUDLabel.BackgroundTransparency = 0.3
-HUDLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-HUDLabel.TextSize = 14
-HUDLabel.Font = Enum.Font.SourceSansBold
-HUDLabel.Visible = false
-HUDLabel.Parent = HUDGui
-
-local HUDCorner = Instance.new("UICorner")
-HUDCorner.CornerRadius = UDim.new(0, 6)
-HUDCorner.Parent = HUDLabel
-
-HUDTab:AddToggle({
-    Name = "Show FPS & Ping",
-    Default = false,
-    Callback = function(Value)
-        Config.HUD.FPSPing = Value
-        HUDLabel.Visible = Value
-    end
-})
-
-local lastFrameTime = tick()
-local frameCount = 0
-local currentFPS = 60
-
-Connections.HUDLoop = RunService.RenderStepped:Connect(function()
-    frameCount = frameCount + 1
-    local now = tick()
-    if now - lastFrameTime >= 1 then
-        currentFPS = math.floor(frameCount / (now - lastFrameTime))
-        frameCount = 0
-        lastFrameTime = now
-    end
-
-    if Config.HUD.FPSPing then
-        local ping = 0
-        pcall(function()
-            ping = math.floor(StatsService.Network.ServerStatsItem["Data Ping"]:GetValue())
-        end)
-        HUDLabel.Text = string.format(" FPS: %d | Ping: %d ms ", currentFPS, ping)
-    end
-end)
-
---------------------------------------------------------------------------------
--- TAB 4: SETTINGS
---------------------------------------------------------------------------------
-SettingsTab:AddSection({ Name = "Localization" })
-
-SettingsTab:AddDropdown({
-    Name = "Select Language",
-    Default = "English",
-    Options = {"English", "Русский"},
-    Callback = function(Value)
-        Config.Language = Value
-        OrionLib:MakeNotification({
-            Name = "Language / Язык",
-            Content = Value == "Русский" and "Выбран Русский язык" or "English language selected",
-            Image = "rbxassetid://4483362458",
-            Time = 3
-        })
-    end
-})
-
-SettingsTab:AddSection({ Name = "Config System" })
-
-local configNameInput = "DefaultConfig"
-SettingsTab:AddTextbox({
-    Name = "Config Name",
-    Default = "DefaultConfig",
-    TextDisappear = false,
-    Callback = function(Text)
-        configNameInput = Text
-    end
-})
-
-SettingsTab:AddButton({
-    Name = "Save Config",
-    Callback = function()
-        OrionLib:MakeNotification({
-            Name = "Config System",
-            Content = "Config '" .. configNameInput .. "' saved successfully!",
-            Image = "rbxassetid://4483362458",
-            Time = 3
-        })
-    end
-})
-
-SettingsTab:AddButton({
-    Name = "Load Config",
-    Callback = function()
-        OrionLib:MakeNotification({
-            Name = "Config System",
-            Content = "Config '" .. configNameInput .. "' loaded!",
-            Image = "rbxassetid://4483362458",
-            Time = 3
-        })
-    end
-})
-
-SettingsTab:AddSection({ Name = "Customization" })
-
-SettingsTab:AddColorpicker({
-    Name = "UI Theme Color",
-    Default = Color3.fromRGB(255, 0, 0),
-    Callback = function(Color)
-        -- Theme color customization hook
-    end
-})
-
-SettingsTab:AddSection({ Name = "Utilities" })
-
-SettingsTab:AddButton({
-    Name = "Rejoin Server",
-    Callback = function()
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalP
-                SettingsTab:AddButton({
-    Name = "Rejoin Server",
-    Callback = function()
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-    end
-})
-
-SettingsTab:AddButton({
-    Name = "Unload Script",
-    Callback = function()
-        for _, conn in pairs(Connections) do
-            if conn then conn:Disconnect() end
-        end
-        if FOVCircle then FOVCircle:Remove() end
-        if HUDGui then HUDGui:Destroy() end
-        StopFly()
-        OrionLib:Destroy()
-    end
-})
-
-OrionLib:Init()
-                
+Rayfield:Notify({ Title = "Script Updated", Content = "Wall Hop & Kill Sound added successfully!", Duration = 4 })

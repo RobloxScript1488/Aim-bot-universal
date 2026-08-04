@@ -1,78 +1,118 @@
--- Universal Script with Rayfield Library (China Hat, FOV Aimbot, Hitboxes, Kill Say & Movement)
+-- Universal Script with Rayfield Library (v3 Complete Update)
 -- Optimized for Delta Executor (PC / Mobile)
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local Window = Rayfield:CreateWindow({
-    Name = "Universal Script | Delta Edition",
-    LoadingTitle = "Initializing All Modules...",
-    LoadingSubtitle = "by Assistant",
-    ConfigurationSaving = { Enabled = false },
-    KeySystem = false
-})
 
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local TextChatService = game:GetService("TextChatService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local Stats = game:GetService("Stats")
+local SoundService = game:GetService("SoundService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- Global Configurations
+-- Global Configurations & State Management
+local Connections = {}
 local Config = {
+    Language = "EN", -- "EN" or "RU"
     ChinaHat = { Enabled = false, Color = Color3.fromRGB(255, 0, 0), RGB = false, RotationSpeed = 100 },
     Aimbot = { Enabled = false, ShowFOV = false, FOVRadius = 120, Smoothness = 0.2, Priority = "Crosshair", WallCheck = false, TeamCheck = true, AliveCheck = true },
     Hitbox = { Enabled = false, Size = 10, Transparency = 0.5, Color = Color3.fromRGB(255, 0, 0), AlwaysOnTop = false, TeamCheck = true },
-    KillSay = { Enabled = false, Message = "ez" },
     Movement = {
         Speed = { Enabled = false, Value = 16, Default = 16 },
         Gravity = { Enabled = false, Value = 196.2, Default = 196.2 },
-        Jump = { Enabled = false, Value = 50, DefaultPower = 50, DefaultHeight = 7.2 }
-    }
+        Jump = { Enabled = false, Value = 50, DefaultPower = 50, DefaultHeight = 7.2 },
+        WallHop = { Enabled = false, Level = 1 },
+        Noclip = { Enabled = false },
+        Fly = { Enabled = false, Speed = 50 },
+        Fling = { Enabled = false }
+    },
+    KillSound = { Enabled = false, SoundId = "132059151263428" },
+    HUD = { FPSPing = false }
 }
 
 --------------------------------------------------------------------------------
--- STABLE FOV GUI (ScreenGui for Delta/Mobile compatibility)
+-- DRAWING FOV CIRCLE (STRICTLY ROUND)
 --------------------------------------------------------------------------------
-local FOVGui = Instance.new("ScreenGui")
-FOVGui.Name = "UniversalFOVScreen"
-FOVGui.ResetOnSpawn = false
-FOVGui.IgnoreGuiInset = true
-FOVGui.Parent = game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
-
-local FOVFrame = Instance.new("Frame")
-FOVFrame.Size = UDim2.new(1, 0, 1, 0)
-FOVFrame.BackgroundTransparency = 1
-FOVFrame.Visible = false
-FOVFrame.Parent = FOVGui
-
-local FOVStroke = Instance.new("UIStroke")
-FOVStroke.Color = Color3.fromRGB(255, 255, 255)
-FOVStroke.Thickness = 1.5
-
-local FOVCorner = Instance.new("UICorner")
-FOVCorner.CornerRadius = UDim.new(1, 0)
-
-local FOVIndicator = Instance.new("Frame")
-FOVIndicator.Name = "Circle"
-FOVIndicator.AnchorPoint = Vector2.new(0.5, 0.5)
-FOVIndicator.BackgroundTransparency = 1
-FOVIndicator.Parent = FOVFrame
-FOVStroke.Parent = FOVIndicator
-FOVCorner.Parent = FOVIndicator
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1.5
+FOVCircle.NumSides = 64 -- High num sides ensures perfectly round shape
+FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+FOVCircle.Visible = false
 
 --------------------------------------------------------------------------------
--- TABS
+-- HUD OVERLAY (FPS & PING)
+--------------------------------------------------------------------------------
+local HUDGui = Instance.new("ScreenGui")
+HUDGui.Name = "UniversalHUDOverlay"
+HUDGui.ResetOnSpawn = false
+HUDGui.Parent = game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+
+local HUDLabel = Instance.new("TextLabel")
+HUDLabel.Size = UDim2.new(0, 160, 0, 30)
+HUDLabel.Position = UDim2.new(0, 10, 0, 10)
+HUDLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+HUDLabel.BackgroundTransparency = 0.3
+HUDLabel.TextColor3 = Color3.fromRGB(0, 255, 127)
+HUDLabel.TextSize = 14
+HUDLabel.Font = Enum.Font.SourceSansBold
+HUDLabel.Text = "FPS: 0 | Ping: 0 ms"
+HUDLabel.Visible = false
+HUDLabel.Parent = HUDGui
+
+local HUDCorner = Instance.new("UICorner")
+HUDCorner.CornerRadius = UDim.new(0, 6)
+HUDCorner.Parent = HUDLabel
+
+local frameCount = 0
+local lastCheck = tick()
+local currentFPS = 0
+
+Connections["HUD_Loop"] = RunService.RenderStepped:Connect(function(dt)
+    if Config.HUD.FPSPing then
+        frameCount = frameCount + 1
+        if tick() - lastCheck >= 1 then
+            currentFPS = frameCount
+            frameCount = 0
+            lastCheck = tick()
+        end
+        
+        local ping = 0
+        pcall(function()
+            ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+        end)
+        
+        HUDLabel.Text = string.format("FPS: %d | Ping: %d ms", currentFPS, ping)
+    end
+end)
+
+--------------------------------------------------------------------------------
+-- WINDOW CREATION
+--------------------------------------------------------------------------------
+local Window = Rayfield:CreateWindow({
+    Name = "Universal Script | Delta Edition",
+    LoadingTitle = "Initializing System...",
+    LoadingSubtitle = "by Assistant",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false
+})
+
+--------------------------------------------------------------------------------
+-- TABS CREATION
 --------------------------------------------------------------------------------
 local HatTab = Window:CreateTab("China Hat", 4483362458)
 local AimTab = Window:CreateTab("FOV Aimbot", 4483362458)
 local HitboxTab = Window:CreateTab("Hitbox Expander", 4483362458)
 local MoveTab = Window:CreateTab("Movement / Physics", 4483362458)
-local MiscTab = Window:CreateTab("Misc / KillSay", 4483362458)
+local MiscTab = Window:CreateTab("Misc / Combat", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
 --------------------------------------------------------------------------------
 -- MODULE 1: CHINA HAT
@@ -115,7 +155,7 @@ HatTab:CreateToggle({
 })
 
 local hue = 0
-RunService.RenderStepped:Connect(function(dt)
+Connections["Hat_Loop"] = RunService.RenderStepped:Connect(function(dt)
     if Config.ChinaHat.Enabled then
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Head") then
@@ -139,7 +179,7 @@ end)
 -- MODULE 2: FOV AIMBOT
 --------------------------------------------------------------------------------
 AimTab:CreateToggle({ Name = "Enable Aimbot", CurrentValue = false, Callback = function(V) Config.Aimbot.Enabled = V end })
-AimTab:CreateToggle({ Name = "Draw FOV Circle", CurrentValue = false, Callback = function(V) Config.Aimbot.ShowFOV = V; FOVFrame.Visible = V end })
+AimTab:CreateToggle({ Name = "Draw FOV Circle", CurrentValue = false, Callback = function(V) Config.Aimbot.ShowFOV = V end })
 AimTab:CreateSlider({ Name = "FOV Radius", Range = {30, 500}, Increment = 5, CurrentValue = 120, Callback = function(V) Config.Aimbot.FOVRadius = V end })
 AimTab:CreateSlider({ Name = "Smoothness", Range = {0.01, 1}, Increment = 0.01, CurrentValue = 0.2, Callback = function(V) Config.Aimbot.Smoothness = V end })
 AimTab:CreateDropdown({ Name = "Priority Mode", Options = {"Crosshair", "Distance", "Lowest Health"}, CurrentOption = "Crosshair", Callback = function(V) Config.Aimbot.Priority = typeof(V) == "table" and V[1] or V end })
@@ -159,7 +199,7 @@ end
 local function GetClosestTarget()
     local bestTarget = nil
     local bestMetric = math.huge
-    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local mousePos = UserInputService:GetMouseLocation()
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
@@ -172,11 +212,11 @@ local function GetClosestTarget()
                         local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
                         if onScreen then
                             local screenVec = Vector2.new(screenPos.X, screenPos.Y)
-                            local distFromCenter = (screenVec - screenCenter).Magnitude
+                            local distFromMouse = (screenVec - mousePos).Magnitude
 
-                            if distFromCenter <= Config.Aimbot.FOVRadius then
+                            if distFromMouse <= Config.Aimbot.FOVRadius then
                                 if IsVisible(head, char) then
-                                    local metric = distFromCenter
+                                    local metric = distFromMouse
                                     if Config.Aimbot.Priority == "Distance" then
                                         local myChar = LocalPlayer.Character
                                         if myChar and myChar:FindFirstChild("HumanoidRootPart") then
@@ -201,11 +241,11 @@ local function GetClosestTarget()
     return bestTarget
 end
 
-RunService.RenderStepped:Connect(function()
-    local viewportSize = Camera.ViewportSize
-    local centerPos = UDim2.new(0, viewportSize.X / 2, 0, viewportSize.Y / 2)
-    FOVIndicator.Position = centerPos
-    FOVIndicator.Size = UDim2.new(0, Config.Aimbot.FOVRadius * 2, 0, Config.Aimbot.FOVRadius * 2)
+Connections["Aimbot_Loop"] = RunService.RenderStepped:Connect(function()
+    local mousePos = UserInputService:GetMouseLocation()
+    FOVCircle.Position = mousePos
+    FOVCircle.Radius = Config.Aimbot.FOVRadius
+    FOVCircle.Visible = Config.Aimbot.ShowFOV
 
     if Config.Aimbot.Enabled then
         local targetHead = GetClosestTarget()
@@ -227,7 +267,7 @@ HitboxTab:CreateColorPicker({ Name = "Color", Color = Color3.fromRGB(255, 0, 0),
 HitboxTab:CreateToggle({ Name = "Always On Top", CurrentValue = false, Callback = function(V) Config.Hitbox.AlwaysOnTop = V end })
 HitboxTab:CreateToggle({ Name = "Team Check", CurrentValue = true, Callback = function(V) Config.Hitbox.TeamCheck = V end })
 
-RunService.Heartbeat:Connect(function()
+Connections["Hitbox_Loop"] = RunService.Heartbeat:Connect(function()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local isTeammate = Config.Hitbox.TeamCheck and (player.Team == LocalPlayer.Team)
@@ -252,14 +292,13 @@ RunService.Heartbeat:Connect(function()
 end)
 
 --------------------------------------------------------------------------------
--- MODULE 4: MOVEMENT / PHYSICS
+-- MODULE 4: MOVEMENT & PHYSICS
 --------------------------------------------------------------------------------
 local SpeedSlider, GravitySlider, JumpSlider
 
--- Speed Hack Controls
+-- WalkSpeed
 MoveTab:CreateToggle({
-    Name = "Enable Speedhack",
-    CurrentValue = false,
+    Name = "Enable Speedhack", CurrentValue = false,
     Callback = function(Value)
         Config.Movement.Speed.Enabled = Value
         if not Value then
@@ -270,69 +309,41 @@ MoveTab:CreateToggle({
         end
     end
 })
-
 SpeedSlider = MoveTab:CreateSlider({
-    Name = "WalkSpeed Slider",
-    Range = {16, 50},
-    Increment = 1,
-    CurrentValue = 16,
-    Callback = function(Value)
-        Config.Movement.Speed.Value = Value
-    end
+    Name = "WalkSpeed Slider", Range = {16, 50}, Increment = 1, CurrentValue = 16,
+    Callback = function(Value) Config.Movement.Speed.Value = Value end
 })
-
 MoveTab:CreateInput({
-    Name = "Exact WalkSpeed (Input)",
-    PlaceholderText = "16 - 50+",
-    RemoveTextOnFocusLost = false,
+    Name = "Exact WalkSpeed (Input)", PlaceholderText = "16 - 50+", RemoveTextOnFocusLost = false,
     Callback = function(Text)
         local num = tonumber(Text)
-        if num then
-            Config.Movement.Speed.Value = num
-            pcall(function() SpeedSlider:Set(num) end)
-        end
+        if num then Config.Movement.Speed.Value = num; pcall(function() SpeedSlider:Set(num) end) end
     end
 })
 
--- Gravity Controls
+-- Gravity
 MoveTab:CreateToggle({
-    Name = "Enable Custom Gravity",
-    CurrentValue = false,
+    Name = "Enable Custom Gravity", CurrentValue = false,
     Callback = function(Value)
         Config.Movement.Gravity.Enabled = Value
-        if not Value then
-            Workspace.Gravity = Config.Movement.Gravity.Default
-        end
+        if not Value then Workspace.Gravity = Config.Movement.Gravity.Default end
     end
 })
-
 GravitySlider = MoveTab:CreateSlider({
-    Name = "Gravity Slider",
-    Range = {0, 196.2},
-    Increment = 1,
-    CurrentValue = 196.2,
-    Callback = function(Value)
-        Config.Movement.Gravity.Value = Value
-    end
+    Name = "Gravity Slider", Range = {0, 196.2}, Increment = 1, CurrentValue = 196.2,
+    Callback = function(Value) Config.Movement.Gravity.Value = Value end
 })
-
 MoveTab:CreateInput({
-    Name = "Exact Gravity (Input)",
-    PlaceholderText = "0 - 196.2",
-    RemoveTextOnFocusLost = false,
+    Name = "Exact Gravity (Input)", PlaceholderText = "0 - 196.2", RemoveTextOnFocusLost = false,
     Callback = function(Text)
         local num = tonumber(Text)
-        if num then
-            Config.Movement.Gravity.Value = num
-            pcall(function() GravitySlider:Set(num) end)
-        end
+        if num then Config.Movement.Gravity.Value = num; pcall(function() GravitySlider:Set(num) end) end
     end
 })
 
--- Jump Power / Height Controls
+-- Jump Power
 MoveTab:CreateToggle({
-    Name = "Enable Custom Jump",
-    CurrentValue = false,
+    Name = "Enable Custom Jump", CurrentValue = false,
     Callback = function(Value)
         Config.Movement.Jump.Enabled = Value
         if not Value then
@@ -345,107 +356,110 @@ MoveTab:CreateToggle({
         end
     end
 })
-
 JumpSlider = MoveTab:CreateSlider({
-    Name = "Jump Slider",
-    Range = {7.2, 250},
-    Increment = 1,
-    CurrentValue = 50,
-    Callback = function(Value)
-        Config.Movement.Jump.Value = Value
-    end
+    Name = "Jump Slider", Range = {7.2, 250}, Increment = 1, CurrentValue = 50,
+    Callback = function(Value) Config.Movement.Jump.Value = Value end
 })
-
 MoveTab:CreateInput({
-    Name = "Exact Jump (Input)",
-    PlaceholderText = "7.2 - 250",
-    RemoveTextOnFocusLost = false,
+    Name = "Exact Jump (Input)", PlaceholderText = "7.2 - 250", RemoveTextOnFocusLost = false,
     Callback = function(Text)
         local num = tonumber(Text)
-        if num then
-            Config.Movement.Jump.Value = num
-            pcall(function() JumpSlider:Set(num) end)
+        if num then Config.Movement.Jump.Value = num; pcall(function() JumpSlider:Set(num) end) end
+    end
+})
+
+-- Wall Hop
+MoveTab:CreateToggle({
+    Name = "Enable Wall Hop", CurrentValue = false,
+    Callback = function(Value) Config.Movement.WallHop.Enabled = Value end
+})
+MoveTab:CreateSlider({
+    Name = "Wall Hop Acceleration Level", Range = {1, 5}, Increment = 1, CurrentValue = 1,
+    Callback = function(Value) Config.Movement.WallHop.Level = Value end
+})
+
+-- Jump Impulse Hook for Wall Hop
+Connections["WallHop_Hook"] = UserInputService.JumpRequest:Connect(function()
+    if Config.Movement.WallHop.Enabled then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            local boost = Config.Movement.WallHop.Level * 15
+            hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, hrp.AssemblyLinearVelocity.Y + boost, hrp.AssemblyLinearVelocity.Z)
+        end
+    end
+end)
+
+-- Fly & Noclip
+MoveTab:CreateToggle({
+    Name = "Enable Noclip", CurrentValue = false,
+    Callback = function(Value) Config.Movement.Noclip.Enabled = Value end
+})
+
+Connections["Noclip_Loop"] = RunService.Stepped:Connect(function()
+    if Config.Movement.Noclip.Enabled then
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+local flying = false
+local flyBodyVel, flyBodyGyro
+MoveTab:CreateToggle({
+    Name = "Enable Fly", CurrentValue = false,
+    Callback = function(Value)
+        Config.Movement.Fly.Enabled = Value
+        flying = Value
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            if flying then
+                flyBodyVel = Instance.new("BodyVelocity")
+                flyBodyVel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                flyBodyVel.Velocity = Vector3.zero
+                flyBodyVel.Parent = hrp
+
+                flyBodyGyro = Instance.new("BodyGyro")
+                flyBodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+                flyBodyGyro.CFrame = hrp.CFrame
+                flyBodyGyro.Parent = hrp
+            else
+                if flyBodyVel then flyBodyVel:Destroy() end
+                if flyBodyGyro then flyBodyGyro:Destroy() end
+            end
         end
     end
 })
 
--- Bypass Loop (Prevents anti-cheat resets and animation overrides)
-RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    if char then
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            if Config.Movement.Speed.Enabled then
-                humanoid.WalkSpeed = Config.Movement.Speed.Value
-            end
+MoveTab:CreateSlider({
+    Name = "Fly Speed", Range = {10, 200}, Increment = 5, CurrentValue = 50,
+    Callback = function(Value) Config.Movement.Fly.Speed = Value end
+})
 
-            if Config.Movement.Jump.Enabled then
-                if humanoid.UseJumpPower then
-                    humanoid.JumpPower = Config.Movement.Jump.Value
-                else
-                    humanoid.JumpHeight = Config.Movement.Jump.Value
-                end
-            end
-        end
-    end
-
-    if Config.Movement.Gravity.Enabled then
-        Workspace.Gravity = Config.Movement.Gravity.Value
-    end
-end)
-
---------------------------------------------------------------------------------
--- MODULE 5: AUTO-CHAT / KILL SAY
---------------------------------------------------------------------------------
-MiscTab:CreateToggle({ Name = "Enable Kill Say", CurrentValue = false, Callback = function(V) Config.KillSay.Enabled = V end })
-MiscTab:CreateInput({ Name = "Kill Say Text", PlaceholderText = "ez", RemoveTextOnFocusLost = false, Callback = function(Text) if Text and #Text > 0 then Config.KillSay.Message = Text end end })
-
-local function SendChatMessage(msg)
-    pcall(function()
-        if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-            local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
-            if channel then channel:SendAsync(msg) end
-        else
-            local sayEvent = ReplicatedStorage:FindFirstChild("SayMessageRequest", true)
-            if sayEvent then sayEvent:FireServer(msg, "All") end
-        end
-    end)
-end
-
-local function HookPlayer(player)
-    if player == LocalPlayer then return end
-    player.CharacterAdded:Connect(function(char)
-        local hum = char:WaitForChild("Humanoid", 5)
-        if hum then
-            hum.Died:Connect(function()
-                if Config.KillSay.Enabled then
-                    SendChatMessage(Config.KillSay.Message)
-                end
-            end)
-        end
-    end)
-end
-
-for _, p in ipairs(Players:GetPlayers()) do HookPlayer(p) end
-Players.PlayerAdded:Connect(HookPlayer)
-
---------------------------------------------------------------------------------
--- RESPAWN & RECOVERY LOGIC (CharacterAdded)
---------------------------------------------------------------------------------
-LocalPlayer.CharacterAdded:Connect(function(char)
-    local hum = char:WaitForChild("Humanoid", 5)
-    if hum then
-        if Config.Movement.Speed.Enabled then
-            hum.WalkSpeed = Config.Movement.Speed.Value
-        end
-        if Config.Movement.Jump.Enabled then
-            if hum.UseJumpPower then
-                hum.JumpPower = Config.Movement.Jump.Value
+Connections["Fly_Loop"] = RunService.RenderStepped:Connect(function()
+    if Config.Movement.Fly.Enabled and flying then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") and flyBodyVel and flyBodyGyro then
+            local hrp = char.HumanoidRootPart
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local moveVec = hum and hum.MoveDirection or Vector3.zero
+            
+            flyBodyGyro.CFrame = Camera.CFrame
+            if moveVec.Magnitude > 0 then
+                flyBodyVel.Velocity = (Camera.CFrame.Rotation * moveVec).Unit * Config.Movement.Fly.Speed
             else
-                hum.JumpHeight = Config.Movement.Jump.Value
+                flyBodyVel.Velocity = Vector3.zero
             end
         end
     end
 end)
 
-Rayfield:Notify({ Title = "Full Script Loaded", Content = "Movement & Physics module successfully activated!", Duration = 4 })
+-- Fling
+MoveTab:CreateToggle({
+    Name = "

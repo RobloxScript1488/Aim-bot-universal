@@ -51,6 +51,6 @@ AimTab:CreateButton({
     Name = "Infinity Yield",
     Callback = function()
         Rayfield:Destroy()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/Universal/main/Inf.lua"))()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
     end,
 })

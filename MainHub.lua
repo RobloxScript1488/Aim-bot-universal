@@ -24,7 +24,7 @@ GamesTab:CreateButton({
     Name = "Crazy Party Rpg",
     Callback = function()
         Rayfield:Destroy()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/Aim-bot-universal/main/CrazyPartyRpg.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/Universal/main/CrazyPartyRpg.lua"))()
     end,
 })
 
@@ -35,6 +35,6 @@ AimTab:CreateButton({
     Name = "Aim Assist + Hub",
     Callback = function()
         Rayfield:Destroy()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/Aim-bot-universal/main/Universa.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/Universal/main/Universa.lua"))()
     end,
 })

@@ -28,6 +28,14 @@ GamesTab:CreateButton({
     end,
 })
 
+GamesTab:CreateButton({
+    Name = "TBO (jjs)",
+    Callback = function()
+        Rayfield:Destroy()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/cool5013/TBO/main/TBOscript"))()
+    end,
+})
+
 local AimTab = Window:CreateTab("Aim Assist", "crosshair")
 AimTab:CreateSection("Функции")
 
@@ -36,5 +44,13 @@ AimTab:CreateButton({
     Callback = function()
         Rayfield:Destroy()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/Universal/main/Universa.lua"))()
+    end,
+})
+
+AimTab:CreateButton({
+    Name = "Infinity Yield",
+    Callback = function()
+        Rayfield:Destroy()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/Universal/main/Inf.lua"))()
     end,
 })

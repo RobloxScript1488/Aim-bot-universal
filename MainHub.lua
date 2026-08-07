@@ -2,8 +2,8 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
     Name = "Universal Script Hub",
-    LoadingTitle = "Hub",
-    LoadingSubtitle = "by Script Hub",
+    LoadingTitle = "script hub",
+    LoadingSubtitle = "by Gubby",
     ConfigurationSaving = {
         Enabled = false,
         FolderName = nil,
@@ -24,7 +24,7 @@ GamesTab:CreateButton({
     Name = "Crazy Party Rpg",
     Callback = function()
         Rayfield:Destroy()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/Universal/main/CrazyPartyRpg.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/CrazyRpg/main/CrazyPartyRng.lua"))()
     end,
 })
 
@@ -43,7 +43,7 @@ AimTab:CreateButton({
     Name = "Aim Assist + Hub",
     Callback = function()
         Rayfield:Destroy()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/Universal/main/Universa.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/RobloxScript1488/AimBot/main/Aimbot.lua"))()
     end,
 })
 
